@@ -1,0 +1,32 @@
+# สมุดบันทึกชั่วโมงเรียน บ้านดนตรีครูแป้
+
+เว็บสมุดบันทึกสำหรับเจ้าของโรงเรียนคนเดียว: นักเรียน ตารางสอน เช็คชื่อ ชั่วโมงเรียน รายรับรายจ่าย
+ข้อมูลเก็บบน Firebase (Firestore) และต้องล็อกอินด้วยอีเมลกับรหัสผ่านก่อนเข้าใช้
+
+> หน้าเว็บบน GitHub Pages เปิดดูได้ทุกคน แต่ **ข้อมูลนักเรียนไม่อยู่ในไฟล์เว็บ** อยู่ใน Firebase ซึ่งอ่านได้เฉพาะบัญชีเจ้าของตาม `firestore.rules`
+> ความปลอดภัยจริงมาจาก Rules ข้อ 4 ด้านล่าง **อย่าข้ามขั้นตอนนี้**
+
+## ตั้งค่าครั้งแรก (ใช้แพ็กเกจฟรี Spark ไม่ต้องผูกบัตร)
+
+1. **สร้างโปรเจกต์** ที่ https://console.firebase.google.com → Add project (ปิด Google Analytics ได้)
+2. **เปิดระบบล็อกอิน** Build → Authentication → Get started → Sign-in method → เปิด **Email/Password**
+   แล้วไปแท็บ Users → **Add user** ใส่อีเมลและรหัสผ่านของคุณ (ใช้รหัสผ่านที่เดายาก)
+   จากนั้นคัดลอกค่า **User UID** ของบัญชีนี้เก็บไว้
+3. **สร้างฐานข้อมูล** Build → Firestore Database → Create database → เลือกโหมด **Production** และที่ตั้ง `asia-southeast1` (สิงคโปร์)
+4. **ตั้ง Rules** แท็บ Rules ของ Firestore: วางเนื้อหาจากไฟล์ `firestore.rules` แล้วแทน `PUT_OWNER_UID_HERE` ด้วย UID ในข้อ 2 → Publish
+5. **ผูกเว็บแอพ** Project settings (รูปเฟือง) → Your apps → ไอคอน `</>` → ตั้งชื่ออะไรก็ได้ → คัดลอก `firebaseConfig`
+   ไปใส่ในไฟล์ `firebase-config.js` (แทนค่า `YOUR_...`)
+6. **(แนะนำ)** Authentication → Settings → User actions → ปิด **Enable create (sign-up)** เพื่อกันคนอื่นสมัครบัญชีเพิ่ม
+   และที่ Authentication → Settings → Authorized domains ให้เพิ่มโดเมนของเว็บ เช่น `ชื่อบัญชี.github.io`
+
+## เปิดเว็บด้วย GitHub Pages
+
+Repo → Settings → Pages → Source: **Deploy from a branch** → Branch: `main` / `(root)` → Save
+รอ 1-2 นาที จะได้ลิงก์ `https://ชื่อบัญชี.github.io/ชื่อrepo/`
+
+## หมายเหตุ
+
+- รูปหน้าแรกของโรงเรียนถูกย่อและเก็บใน Firestore (ไม่ต้องใช้ Firebase Storage) เพิ่มได้สูงสุด 10 รูปในเมนู “รูปโรงเรียน”
+- ปุ่มส่งออก Excel ดาวน์โหลดไฟล์ลงเครื่องโดยตรง
+- โควตาฟรีของ Firebase เพียงพอสำหรับโรงเรียนขนาด 100 คนที่ใช้คนเดียว
+- ถ้าลืมรหัสผ่าน กด “ลืมรหัสผ่าน” ที่หน้าล็อกอิน ระบบจะส่งลิงก์ตั้งรหัสใหม่ไปที่อีเมล
