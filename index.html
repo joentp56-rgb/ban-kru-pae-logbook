@@ -1188,8 +1188,47 @@ function openSettings(){
       +'<label class="f">ค่าเรียนต่อเดือน (บาท)<input class="in" type="number" id="s_'+k+'_p" min="0" step="50" value="'+num(c.price)+'"></label>'
       +'<label class="f">ชดเชยได้ (วัน/เดือน)<input class="in" type="number" id="s_'+k+'_d" min="0" step="1" value="'+c.makeupDays+'"></label></div></div>';}).join('')
     +'<div class="frm">'
-    +'<label class="f">ความยาวคลาสปกติ (ชั่วโมง)<input class="in" type="number" id="s_sh" min="0.5" step="0.5" value="'+num(s.sessionHours)+'"></label></div>';
+    +'<label class="f">ความยาวคลาสปกติ (ชั่วโมง)<input class="in" type="number" id="s_sh" min="0.5" step="0.5" value="'+num(s.sessionHours)+'"></label></div>'
+    +backupBlock();
   dlg('ตั้งค่า',body,'<button class="btn" data-act="close">ยกเลิก</button><button class="btn primary" data-act="savesettings">บันทึก</button>');
+}
+function backupBlock(){
+  return '<div><h3>สำรองและนำเข้าข้อมูล</h3><div class="muted small">สำรองข้อมูลทั้งหมดเป็นไฟล์ .json เก็บไว้ในเครื่อง หรือนำเข้าไฟล์สำรองกลับเข้าสมุด (ข้อมูลที่มี id เดียวกันจะถูกเขียนทับ ส่วนรูปโรงเรียนไม่รวมในไฟล์สำรอง)</div>'
+    +'<div class="toolbar" style="margin-top:10px"><button class="btn" data-act="backup">สำรองข้อมูล (ดาวน์โหลด)</button><button class="btn" data-act="importpick">นำเข้าข้อมูลจากไฟล์</button>'
+    +'<input type="file" id="imp_file" accept="application/json,.json" hidden></div><div class="muted small" id="imp_msg" role="status"></div></div>';
+}
+function saveDownload(blob,filename){
+  var url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download=filename;document.body.appendChild(a);a.click();
+  setTimeout(function(){URL.revokeObjectURL(url);a.remove();},1500);
+}
+function exportBackup(){
+  var out={app:'ban-kru-pae-logbook',version:1,exportedAt:new Date().toISOString(),data:{}};
+  COLLS.forEach(function(c){out.data[c]={};st[c].forEach(function(v,id){out.data[c][id]=strip(v);});});
+  out.data.settings={main:clone(st.settings)};
+  saveDownload(new Blob([JSON.stringify(out)],{type:'application/json'}),'สำรองข้อมูล-บ้านดนตรีครูแป้-'+todayISO()+'.json');
+  toast('ดาวน์โหลดไฟล์สำรองแล้ว');
+}
+async function importBackup(file){
+  var msg=document.getElementById('imp_msg');
+  function say(t){if(msg)msg.textContent=t;}
+  try{
+    var obj=JSON.parse(await file.text());
+    if(!obj||obj.app!=='ban-kru-pae-logbook'||!obj.data)throw new Error('ไฟล์นี้ไม่ใช่ไฟล์สำรองของสมุดบันทึก');
+    var cols=COLLS.concat(['settings']),total=0,summary=[];
+    cols.forEach(function(c){var n=Object.keys(obj.data[c]||{}).length;total+=n;if(n&&c!=='settings')summary.push(n+' รายการ ('+c+')');});
+    if(!total)throw new Error('ไม่พบข้อมูลในไฟล์');
+    if(!window.confirm('นำเข้าข้อมูล '+total+' รายการ\n'+summary.join(', ')+'\nข้อมูลที่มี id เดียวกันจะถูกเขียนทับ ต้องการนำเข้าใช่ไหม?'))return;
+    var ops=[];
+    cols.forEach(function(c){var d=obj.data[c]||{};Object.keys(d).forEach(function(id){ops.push([c+'/'+id,d[id]]);});});
+    for(var i=0;i<ops.length;i+=400){
+      say('กำลังนำเข้า '+Math.min(i+400,ops.length)+' จาก '+ops.length+'…');
+      var b=st.db.batch();
+      ops.slice(i,i+400).forEach(function(o){b.set(st.db.doc(o[0]),o[1]);});
+      await b.commit();
+    }
+    say('');toast('นำเข้าข้อมูลแล้ว '+ops.length+' รายการ');closeDlg();
+  }catch(e){say('');toast((e&&e.message)?e.message:'นำเข้าไม่สำเร็จ',true);}
 }
 async function saveSettings(){
   var teachers=[];
@@ -1283,6 +1322,8 @@ document.addEventListener('click',function(e){
     case 'pickdate':openDatePicker(d.target);break;
     case 'photos':openPhotos();break;
     case 'logout':doLogout();break;
+    case 'backup':exportBackup();break;
+    case 'importpick':{var imf=document.getElementById('imp_file');if(imf)imf.click();break;}
     case 'resetpw':doReset();break;
     case 'photoadd':{var pf=document.getElementById('ph_file');if(pf)pf.click();break;}
     case 'tab':st.tab=d.tab;closeDlg();render();window.scrollTo(0,0);break;
@@ -1343,6 +1384,7 @@ document.addEventListener('change',function(e){
   var t=e.target;
   if(t.id==='filter'){st.filter=t.value;render();}
   else if(t.id&&t.id.indexOf('cal_')===0){var cx=t.id.split('_')[2];calSet(cx,val('cal_y_'+cx)+'-'+val('cal_m_'+cx));}
+  else if(t.id==='imp_file'){var ifile=(t.files||[])[0];t.value='';if(ifile)importBackup(ifile);}
   else if(t.id==='ph_file'){var pfiles=Array.from(t.files||[]);t.value='';uploadPhotos(pfiles);}
   else if(t.id==='attDate'){if(/^\d{4}-\d{2}-\d{2}$/.test(t.value)){st.attDate=t.value;render();}}
   else if(t.dataset&&t.dataset.hrs){var dr=ensureDraft(t.dataset.hrs);dr.hours=+t.value||0;render();}
